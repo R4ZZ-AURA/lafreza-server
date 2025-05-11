@@ -17,16 +17,45 @@ if (!$reservation_id || !$new_status) {
 }
 
 try {
+
+    $pdo->beginTransaction();
+
     $stmt = $pdo->prepare("UPDATE reservations SET status = :status, updated_at = NOW() WHERE reservation_id = :id");
     $stmt->bindParam(':status', $new_status);
     $stmt->bindParam(':id', $reservation_id, PDO::PARAM_INT);
+    $stmt->execute();
 
-    if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Status updated successfully.']);
-    } else {
-        $errorInfo = $stmt->errorInfo();
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $errorInfo[2]]);
+    if ($new_status === 'approved') {
+        $fetch = $pdo->prepare("SELECT guest_id, total_price FROM reservations WHERE reservation_id = :id");
+        $fetch->bindParam(':id', $reservation_id, PDO::PARAM_INT);
+        $fetch->execute();
+        $reservation = $fetch->fetch(PDO::FETCH_ASSOC);
+
+        if ($reservation) {
+            $guest_id = $reservation['guest_id'];
+            $amount = $reservation['total_price'];
+            $payment_method = 'gcash';
+            $status = 'paid';
+            $created_at = date("Y-m-d H:i:s");
+
+            $insertTxn = $pdo->prepare("
+                INSERT INTO transactions (guest_id, reservation_id, amount, payment_method, status, created_at)
+                VALUES (:guest_id, :reservation_id, :amount, :payment_method, :status, :created_at)
+            ");
+            $insertTxn->execute([
+                ':guest_id' => $guest_id,
+                ':reservation_id' => $reservation_id,
+                ':amount' => $amount,
+                ':payment_method' => $payment_method,
+                ':status' => $status,
+                ':created_at' => $created_at
+            ]);
+        }
     }
+
+    $pdo->commit();
+
+    echo json_encode(['success' => true, 'message' => 'Status updated successfully.']);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }

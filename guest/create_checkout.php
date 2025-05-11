@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'description' => 'Downpayment for reservation',
             'remarks' => 'Checkout link for gcash payment',
             'redirect' => [
-              'success' => 'http://localhost:3000/profile',
+              'success' => 'http://localhost:3000/redirect-success.html',
             ]
           ]
         ]
